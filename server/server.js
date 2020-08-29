@@ -2,6 +2,7 @@ const PROTO_PATH = "./customers.proto";
 
 var grpc = require("grpc");
 var protoLoader = require("@grpc/proto-loader");
+var grpcLogger = require("grpc-logger")
 
 var packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 	keepCase: true,
@@ -10,11 +11,32 @@ var packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 	arrays: true
 });
 
+if (process.env.GRPC_VERBOSITY) {
+	switch (process.env.GRPC_VERBOSITY) {
+		case 'DEBUG':
+			_logVerbosity = LogVerbosity.DEBUG;
+			break;
+		case 'INFO':
+			_logVerbosity = LogVerbosity.INFO;
+			break;
+		case 'ERROR':
+			_logVerbosity = LogVerbosity.ERROR;
+			break;
+		default:
+		// Ignore any other values
+	}
+}
+
 var customersProto = grpc.loadPackageDefinition(packageDefinition);
 
 const { v4: uuidv4 } = require("uuid");
 
 const server = new grpc.Server();
+
+/*---------- enable logging using Morgan like Logger ----------*/
+grpcLogger(server)
+/*---------- enable logging using Morgan like Logger ----------*/
+
 const customers = [
 	{
 		id: "a68b823c-7ca6-44bc-b721-fb4d5312cafc",
@@ -31,11 +53,15 @@ const customers = [
 ];
 
 server.addService(customersProto.CustomerService.service, {
+
 	getAll: (_, callback) => {
+		console.log("i received a getAll request", { callback })
 		callback(null, { customers });
 	},
 
 	get: (call, callback) => {
+		console.log("i received a getOne request", { call, callback })
+
 		let customer = customers.find(n => n.id == call.request.id);
 
 		if (customer) {
@@ -49,14 +75,18 @@ server.addService(customersProto.CustomerService.service, {
 	},
 
 	insert: (call, callback) => {
+		console.log("i received an insert request", { call, callback })
+
 		let customer = call.request;
-		
+
 		customer.id = uuidv4();
 		customers.push(customer);
 		callback(null, customer);
 	},
 
 	update: (call, callback) => {
+		console.log("i received a update request", { call, callback })
+
 		let existingCustomer = customers.find(n => n.id == call.request.id);
 
 		if (existingCustomer) {
@@ -73,6 +103,8 @@ server.addService(customersProto.CustomerService.service, {
 	},
 
 	remove: (call, callback) => {
+		console.log("i received a remove request", { call, callback })
+
 		let existingCustomerIndex = customers.findIndex(
 			n => n.id == call.request.id
 		);
